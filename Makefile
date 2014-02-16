@@ -126,6 +126,7 @@ ALL_PORTS = \
      ports/jsoncpp \
      ports/lame \
      ports/lcms \
+     ports/leptonica \
      ports/leveldb \
      ports/libav \
      ports/libhangul \

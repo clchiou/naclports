@@ -4,3 +4,6 @@
 [submodule "ports/jpeg9d"]
 	path = ports/jpeg9d
 	url = https://github.com/clchiou/jpeg.git
+[submodule "ports/leptonica"]
+	path = ports/leptonica
+	url = https://github.com/clchiou/leptonica.git
