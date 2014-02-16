@@ -1,3 +1,6 @@
 [submodule "third_party/hterm/src"]
 	path = third_party/hterm/src
 	url = http://chromium.googlesource.com/apps/libapps.git
+[submodule "ports/jpeg9d"]
+	path = ports/jpeg9d
+	url = https://github.com/clchiou/jpeg.git

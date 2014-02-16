@@ -122,6 +122,7 @@ ALL_PORTS = \
      ports/imagemagick \
      ports/jpeg6b \
      ports/jpeg8d \
+     ports/jpeg9d \
      ports/jsoncpp \
      ports/lame \
      ports/lcms \
