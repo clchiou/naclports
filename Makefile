@@ -189,6 +189,7 @@ ALL_PORTS = \
      ports/sqlite \
      ports/subversion \
      ports/tar \
+     ports/tesseract-ocr \
      ports/thttpd \
      ports/tiff \
      ports/tinyxml \

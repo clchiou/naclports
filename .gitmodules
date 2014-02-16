@@ -7,3 +7,6 @@
 [submodule "ports/leptonica"]
 	path = ports/leptonica
 	url = https://github.com/clchiou/leptonica.git
+[submodule "ports/tesseract-ocr"]
+	path = ports/tesseract-ocr
+	url = https://github.com/clchiou/tesseract-ocr.git
