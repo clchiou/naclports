@@ -24,14 +24,12 @@ TestStep() {
       make test
     done
   else
-    for exe in ${EXECUTABLES}; do
-      if [ ${NACL_GLIBC} = "1" ]; then
-        local script=$(basename ${exe%.*})
-      else
-        local script=${exe%.*}
-      fi
-      WriteSelLdrScript ${script} ${exe}
-    done
+    if [ ${NACL_GLIBC} = "1" ]; then
+      for exe in ${EXECUTABLES}; do
+       local script=$(basename ${exe%.*})
+        WriteSelLdrScript ${script} ${exe}
+      done
+    fi
     make test
   fi
 }

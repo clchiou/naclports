@@ -3,34 +3,27 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-BUILD_DIR=${NACL_PACKAGES_REPOSITORY}/${PACKAGE_NAME}
+BUILD_DIR=${SRC_DIR}
+
+export LIB_OSG=libosg.a
+export LIB_OSGUTIL=libosgUtil.a
+export LIB_OPENTHREADS=libOpenThreads.a
 
 ConfigureStep() {
   return 0
 }
 
 BuildStep() {
-  # export the nacl tools
-  export CC=${NACLCC}
-  export CXX=${NACLCXX}
-  export AR=${NACLAR}
-  export RANLIB=${NACLRANLIB}
-  export CFLAGS=${NACLPORTS_CFLAGS}
-  export CXXFLAGS=${NACLPORTS_CXXFLAGS}
-  export LDFLAGS=${NACLPORTS_LDFLAGS}
-  export PATH=${NACL_BIN_PATH}:${PATH};
-  export LIB_OSG=libosg.a
-  export LIB_OSGUTIL=libosgUtil.a
-  export LIB_OPENTHREADS=libOpenThreads.a
+  SetupCrossEnvironment
+  CFLAGS+=" ${CPPFLAGS}"
+  CXXFLAGS+=" ${CPPFLAGS}"
   DefaultBuildStep
 }
-
 
 InstallStep() {
   Remove ${NACLPORTS_INCLUDE}/osg
   Remove ${NACLPORTS_INCLUDE}/osgUtil
   Remove ${NACLPORTS_INCLUDE}/OpenThreads
-  readonly THIS_PACKAGE_PATH=${NACL_PACKAGES_REPOSITORY}/${PACKAGE_NAME}
   cp -R include/osg ${NACLPORTS_INCLUDE}/osg
   cp -R include/osgUtil ${NACLPORTS_INCLUDE}/osgUtil
   cp -R include/OpenThreads ${NACLPORTS_INCLUDE}/OpenThreads

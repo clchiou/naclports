@@ -2,26 +2,25 @@
 # Copyright (c) 2012 The Native Client Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-#
 
 ######################################################################
 # Notes on directory layout:
 # makefile location (base_dir):  naclports/src
-# bot script location:           naclports/src/build_tools/bots/
 # toolchain injection point:     specified externally via NACL_SDK_ROOT.
 ######################################################################
 
-source bot_common.sh
+SCRIPT_DIR="$(cd $(dirname $0) && pwd)"
+source ${SCRIPT_DIR}/bot_common.sh
 
 set -o nounset
 set -o errexit
 
-readonly BASE_DIR="$(dirname $0)/../.."
-cd ${BASE_DIR}
-
 make clean
-
-BuildPackage all
+readonly PARTCMD="python build_tools/partition.py"
+readonly PACKAGE_LIST=$(${PARTCMD} -t ${SHARD} -n ${SHARDS})
+for PKG in ${PACKAGE_LIST}; do
+  BuildPackage ${PKG}
+done
 
 echo "@@@BUILD_STEP ${NACL_ARCH} Summary@@@"
 if [[ $RESULT != 0 ]] ; then

@@ -37,11 +37,14 @@ RESULT=0
 export PATH=${PATH}:/opt/local/bin
 
 StartBuild() {
-  cd ${BOT_DIR}
-  export NACL_ARCH=$2
+  export NACL_ARCH=$1
+  export SHARD
+  export SHARDS
 
-  echo "@@@BUILD_STEP $2 setup@@@"
-  if ! ./$1 ; then
+  echo "@@@BUILD_STEP $1 setup@@@"
+  # Goto src/
+  cd ${SCRIPT_DIR}/..
+  if ! ./build_tools/build_shard.sh ; then
     RESULT=1
   fi
   cd -
@@ -74,11 +77,11 @@ BUILDBOT_BUILDERNAME=${BUILDBOT_BUILDERNAME#periodic-}
 
 if [ "${BUILDBOT_BUILDERNAME}" != "linux-sdk" ]; then
   # Decode buildername.
-  readonly BNAME_REGEX="(.+)-(.+)-(.+)"
+  readonly BNAME_REGEX="(nightly-)?(.+)-(.+)-(.+)"
   if [[ ${BUILDBOT_BUILDERNAME} =~ $BNAME_REGEX ]]; then
-    readonly OS=${BASH_REMATCH[1]}
-    readonly LIBC=${BASH_REMATCH[2]}
-    readonly SHARD=${BASH_REMATCH[3]}
+    readonly OS=${BASH_REMATCH[2]}
+    readonly LIBC=${BASH_REMATCH[3]}
+    readonly SHARD=${BASH_REMATCH[4]}
   else
     echo "Bad BUILDBOT_BUILDERNAME: ${BUILDBOT_BUILDERNAME}" 1>&2
     exit 1
@@ -107,9 +110,30 @@ if [ "${BUILDBOT_BUILDERNAME}" != "linux-sdk" ]; then
     export NACL_GLIBC=0
   elif [ "$LIBC" = "pnacl_newlib" ]; then
     export NACL_GLIBC=0
+  elif [ "$LIBC" = "bionic" ]; then
+    export NACL_GLIBC=0
   else
     echo "Bad LIBC: ${LIBC}" 1>&2
     exit 1
+  fi
+
+  # Select shard count
+  if [ "$OS" = "mac" ]; then
+    readonly SHARDS=1
+  elif [ "$OS" = "linux" ]; then
+    if [ "$LIBC" = "glibc" ]; then
+      readonly SHARDS=4
+    elif [ "$LIBC" = "newlib" ]; then
+      readonly SHARDS=3
+    elif [ "$LIBC" = "bionic" ]; then
+      readonly SHARDS=1
+    elif [ "$LIBC" = "pnacl_newlib" ]; then
+      readonly SHARDS=4
+    else
+      echo "Unspecified sharding for LIBC: ${LIBC}" 1>&2
+    fi
+  else
+    echo "Unspecified sharding for OS: ${OS}" 1>&2
   fi
 fi
 
@@ -125,33 +149,28 @@ fi
 # PEPPER_DIR is the root direcotry name within the bundle. e.g. pepper_28
 export PEPPER_VERSION=$(${NACL_SDK_ROOT}/tools/getos.py --sdk-version)
 export PEPPER_DIR=pepper_${PEPPER_VERSION}
+export NACLPORTS_ANNOTATE=1
 
 # The SDK builder builds a subset of the ports, but with multiple
 # configurations.
 if [ "${BUILDBOT_BUILDERNAME}" = "linux-sdk" ]; then
-  cd ${SCRIPT_DIR}/bots/linux
+  cd ${SCRIPT_DIR}
   ./naclports-linux-sdk-bundle.sh
   exit 0
 fi
 
-# This a temporary hack until the pnacl support is more mature
 if [ ${LIBC} = "pnacl_newlib" ] ; then
-  BOT_DIR=${SCRIPT_DIR}/bots
-  StartBuild pnacl_bots.sh pnacl
+  StartBuild pnacl
 else
-  # Compute script name.
-  readonly SCRIPT_NAME="naclports-${BOT_OS_DIR}-${SHARD}.sh"
-  BOT_DIR=${SCRIPT_DIR}/bots/${BOT_OS_DIR}
-
   # Build 32-bit.
-  StartBuild ${SCRIPT_NAME} i686
+  StartBuild i686
 
   # Build 64-bit.
-  StartBuild ${SCRIPT_NAME} x86_64
+  StartBuild x86_64
 
   # Build ARM.
   if [ ${NACL_GLIBC} != "1" ]; then
-    StartBuild ${SCRIPT_NAME} arm
+    StartBuild arm
   fi
 fi
 

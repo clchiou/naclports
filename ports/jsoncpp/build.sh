@@ -3,12 +3,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-
+BUILD_DIR=${SRC_DIR}
 
 BuildStep() {
-  export PACKAGE_DIR="${NACL_PACKAGES_REPOSITORY}/${PACKAGE_NAME}"
-  ChangeDir ${PACKAGE_DIR}
-
   export CXXCMD="${NACLCC} -Iinclude -I."
   LogExecute ${CXXCMD} -c src/lib_json/json_reader.cpp
   LogExecute ${CXXCMD} -c src/lib_json/json_value.cpp
@@ -24,8 +21,6 @@ BuildStep() {
 
 
 InstallStep() {
-  export PACKAGE_DIR="${NACL_PACKAGES_REPOSITORY}/${PACKAGE_NAME}"
-
-  LogExecute cp ${PACKAGE_DIR}/libjsoncpp.a ${NACLPORTS_LIBDIR}
-  LogExecute cp -R ${PACKAGE_DIR}/include/json ${NACLPORTS_INCLUDE}
+  LogExecute cp libjsoncpp.a ${NACLPORTS_LIBDIR}
+  LogExecute cp -R include/json ${NACLPORTS_INCLUDE}
 }

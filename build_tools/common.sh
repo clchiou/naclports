@@ -58,14 +58,14 @@ readonly NACLPORTS_INCLUDE=${NACLPORTS_PREFIX}/include
 readonly NACLPORTS_LIBDIR=${NACLPORTS_PREFIX}/lib
 readonly NACLPORTS_PREFIX_BIN=${NACLPORTS_PREFIX}/bin
 
-if [ "${DEFAULT_PREFIX:-}" = "1" ]; then
+NACLPORTS_CFLAGS=""
+NACLPORTS_CXXFLAGS=""
+NACLPORTS_CPPFLAGS="${NACL_CPPFLAGS}"
+
+if [ "${DEFAULT_PREFIX:-}" != "1" ]; then
   # If the PREFIX is the default one then there is not need to add
   # the include path explcitily.
-  NACLPORTS_CFLAGS="${NACL_CFLAGS}"
-  NACLPORTS_CXXFLAGS="${NACL_CXXFLAGS}"
-else
-  NACLPORTS_CFLAGS="-I${NACLPORTS_INCLUDE} ${NACL_CFLAGS}"
-  NACLPORTS_CXXFLAGS="-I${NACLPORTS_INCLUDE} ${NACL_CXXFLAGS}"
+  NACLPORTS_CPPFLAGS+=" -I${NACLPORTS_INCLUDE}"
 fi
 
 # For the library path we always explicly add to the link flags
@@ -106,13 +106,13 @@ else
 fi
 
 if [ ${NACL_DEBUG} = "1" ]; then
-  NACLPORTS_CFLAGS="${NACLPORTS_CFLAGS} -g -O0"
-  NACLPORTS_CXXFLAGS="${NACLPORTS_CXXFLAGS} -g -O0"
+  NACLPORTS_CFLAGS+=" -g -O0"
+  NACLPORTS_CXXFLAGS+=" -g -O0"
 else
-  NACLPORTS_CFLAGS="${NACLPORTS_CFLAGS} -O2"
-  NACLPORTS_CXXFLAGS="${NACLPORTS_CXXFLAGS} -O2"
+  NACLPORTS_CFLAGS+=" -O2"
+  NACLPORTS_CXXFLAGS+=" -O2"
   if [ ${NACL_ARCH} = "pnacl" ]; then
-    NACLPORTS_LDFLAGS="${NACLPORTS_LDFLAGS} -O2"
+    NACLPORTS_LDFLAGS+=" -O2"
   fi
 fi
 
@@ -251,7 +251,7 @@ CheckToolchain() {
 
 
 InstallConfigSite() {
-  local CONFIG_SITE=${NACLPORTS_PREFIX}/share/config.site
+  CONFIG_SITE=${NACLPORTS_PREFIX}/share/config.site
   mkdir -p ${NACLPORTS_PREFIX}/share
   echo "ac_cv_exeext=${NACL_EXEEXT}" > ${CONFIG_SITE}
 }
@@ -390,15 +390,11 @@ TryFetch() {
   local URL=$1
   local FILENAME=$2
   Banner "Fetching ${PACKAGE_NAME} (${FILENAME})"
-  if which wget > /dev/null ; then
-    wget ${URL} -O ${FILENAME}
-  elif which curl > /dev/null ; then
-    curl --fail --location --url ${URL} -o ${FILENAME}
+  if which curl > /dev/null ; then
+    curl --fail --location --progress-bar -o ${FILENAME} ${URL}
   else
-     Banner "Problem encountered"
-     echo "Please install curl or wget and rerun this script"
-     echo "or manually download ${URL} to ${FILENAME}"
-     exit 1
+    Banner "ERROR: could not find 'curl' in your PATH"
+    exit 1
   fi
 }
 
@@ -447,7 +443,6 @@ Check() {
 
 
 DefaultDownloadStep() {
-  ArchiveName
   if [ -z "${ARCHIVE_NAME:-}" ]; then
     return
   fi
@@ -473,10 +468,9 @@ GitCloneStep() {
   local GIT_URL=${URL%@*}
   local COMMIT=${URL#*@}
 
-  cd ${NACL_PACKAGES_REPOSITORY}
-  rm -rf ${PACKAGE_DIR}
-  git clone ${GIT_URL} ${PACKAGE_DIR}
-  cd ${PACKAGE_DIR}
+  Remove ${SRC_DIR}
+  git clone ${GIT_URL} ${SRC_DIR}
+  ChangeDir ${SRC_DIR}
   git reset --hard ${COMMIT}
 
   TouchKeyStamp clone "$URL"
@@ -595,12 +589,6 @@ InitGitRepo() {
 }
 
 
-DefaultCleanStep() {
-  ChangeDir ${NACL_PACKAGES_REPOSITORY}
-  Remove ${PACKAGE_DIR}
-}
-
-
 CheckStamp() {
   local STAMP_DIR="${NACL_PACKAGES_STAMPDIR}/${PACKAGE_NAME}"
   local STAMP_FILE="${STAMP_DIR}/$1"
@@ -682,18 +670,75 @@ InstallNaClTerm() {
 }
 
 
+#
+# Build step for projects based on the NaCl SDK build
+# system (common.mk).
+#
+SetupSDKBuildSystem() {
+  # We override $(OUTBASE) to force the build system to put
+  # all its artifacts in ${SRC_DIR} rather than alongside
+  # the Makefile.
+  export OUTBASE=${SRC_DIR}
+  export CFLAGS="${NACLPORTS_CPPFLAGS} ${NACLPORTS_CFLAGS}"
+  export CXXFLAGS="${NACLPORTS_CPPFLAGS} ${NACLPORTS_CXXFLAGS}"
+  export LDFLAGS=${NACLPORTS_LDFLAGS}
+  export NACLPORTS_INCLUDE
+  export NACLPORTS_PREFIX
+  export NACL_PACKAGES_PUBLISH
+  export NACL_SRC
+
+  if [ "${NACL_ARCH}" = "pnacl" ]; then
+    MAKEFLAGS+=" TOOLCHAIN=pnacl"
+  elif [ "${NACL_GLIBC}" = "1" ]; then
+    MAKEFLAGS+=" TOOLCHAIN=glibc"
+    MAKEFLAGS+=" NACL_ARCH=${NACL_ARCH_ALT}"
+  else
+    MAKEFLAGS+=" TOOLCHAIN=newlib"
+    MAKEFLAGS+=" NACL_ARCH=${NACL_ARCH_ALT}"
+  fi
+  if [ "${NACL_DEBUG}" = "1" ]; then
+    MAKEFLAGS+=" CONFIG=Debug"
+  else
+    MAKEFLAGS+=" CONFIG=Release"
+  fi
+  if [ "${VERBOSE:-}" = "1" ]; then
+    MAKEFLAGS+=" V=1"
+  fi
+  export MAKEFLAGS
+
+  BUILD_DIR=${START_DIR}
+}
+
+
+SetupCrossEnvironment() {
+  # export the nacl tools
+  export CONFIG_SITE
+  export CC=${NACLCC}
+  export CXX=${NACLCXX}
+  export AR=${NACLAR}
+  export RANLIB=${NACLRANLIB}
+  export READELF=${NACLREADELF}
+  export PKG_CONFIG_PATH=${NACLPORTS_LIBDIR}/pkgconfig
+  export PKG_CONFIG_LIBDIR=${NACLPORTS_LIBDIR}
+  export FREETYPE_CONFIG=${NACLPORTS_PREFIX_BIN}/freetype-config
+  export CFLAGS=${NACLPORTS_CFLAGS}
+  export CPPFLAGS=${NACLPORTS_CPPFLAGS}
+  export CXXFLAGS=${NACLPORTS_CXXFLAGS}
+  export LDFLAGS=${NACLPORTS_LDFLAGS}
+  export PATH=${NACL_BIN_PATH}:${NACLPORTS_PREFIX_BIN}:${PATH}
+}
+
+
 ######################################################################
 # Build Steps
 ######################################################################
 DefaultExtractStep() {
-  ArchiveName
   if [ -z "${ARCHIVE_NAME:-}" ]; then
     return
   fi
 
-  ChangeDir ${NACL_PACKAGES_REPOSITORY}
   local ARCHIVE="${NACL_PACKAGES_TARBALLS}/${ARCHIVE_NAME}"
-  if [ -d ${PACKAGE_DIR} ]; then
+  if [ -d ${SRC_DIR} ]; then
     local PATCH="${START_DIR}/${PATCH_FILE:-nacl.patch}"
 
     if CheckStamp extract "${ARCHIVE}" "${PATCH}" ; then
@@ -703,18 +748,17 @@ DefaultExtractStep() {
   fi
 
   Banner "Extracting ${ARCHIVE_NAME}"
-
-  if [ -d ${PACKAGE_DIR} ]; then
-    local FULL_DIR=${NACL_PACKAGES_REPOSITORY}/${PACKAGE_DIR}
+  if [ -d ${SRC_DIR} ]; then
     echo "Upstream archive or patch has changed."
-    echo "Please remove existing workspace to continue: '${FULL_DIR}'"
+    echo "Please remove existing workspace to continue: '${SRC_DIR}'"
     exit 1
   fi
-  Remove ${PACKAGE_DIR}
+  Remove ${SRC_DIR}
 
   # make sure the patch step is applied
   rm -f ${NACL_PACKAGES_STAMPDIR}/${PACKAGE_NAME}/patch
   local EXTENSION="${ARCHIVE_NAME##*.}"
+  ChangeDir $(dirname ${SRC_DIR})
   if [ ${EXTENSION} = "zip" ]; then
     unzip ${ARCHIVE}
   else
@@ -725,6 +769,7 @@ DefaultExtractStep() {
     fi
   fi
 
+  MakeDir ${BUILD_DIR}
   TouchStamp extract
 }
 
@@ -758,7 +803,7 @@ DefaultPatchStep() {
     return
   fi
 
-  ChangeDir ${NACL_PACKAGES_REPOSITORY}/${PACKAGE_DIR}
+  ChangeDir ${SRC_DIR}
 
   if CheckStamp patch ; then
     Banner "Skipping patch step (cleaning source tree)"
@@ -780,7 +825,8 @@ DefaultPatchStep() {
 
 
 DefaultConfigureStep() {
-  if [ -f "${SRC_DIR}/configure" ]; then
+  local CONFIGURE=${NACL_CONFIGURE_PATH:-${SRC_DIR}/configure}
+  if [ -f "${CONFIGURE}" ]; then
     ConfigureStep_Autotools
   elif [ -f "${SRC_DIR}/CMakeLists.txt" ]; then
     ConfigureStep_CMake
@@ -791,23 +837,9 @@ DefaultConfigureStep() {
 
 
 ConfigureStep_Autotools() {
-  # export the nacl tools
-  export CC=${NACLCC}
-  export CXX=${NACLCXX}
-  export AR=${NACLAR}
-  export RANLIB=${NACLRANLIB}
-  export READELF=${NACLREADELF}
-  export PKG_CONFIG_PATH=${NACLPORTS_LIBDIR}/pkgconfig
-  export PKG_CONFIG_LIBDIR=${NACLPORTS_LIBDIR}
-  export FREETYPE_CONFIG=${NACLPORTS_PREFIX_BIN}/freetype-config
-  export CFLAGS=${NACLPORTS_CFLAGS}
-  export CXXFLAGS=${NACLPORTS_CXXFLAGS}
-  export LDFLAGS=${NACLPORTS_LDFLAGS}
-  export PATH=${NACL_BIN_PATH}:${PATH};
-  local CONFIGURE=${NACL_CONFIGURE_PATH:-${SRC_DIR}/configure}
-  MakeDir ${BUILD_DIR}
-  ChangeDir ${BUILD_DIR}
+  SetupCrossEnvironment
 
+  local CONFIGURE=${NACL_CONFIGURE_PATH:-${SRC_DIR}/configure}
   local conf_host=${NACL_CROSS_PREFIX}
   if [ "${NACL_ARCH}" = "pnacl" -o "${NACL_ARCH}" = "emscripten" ]; then
     # The PNaCl tools use "pnacl-" as the prefix, but config.sub
@@ -821,7 +853,9 @@ ConfigureStep_Autotools() {
     return
   fi
 
+  echo "CPPFLAGS=${CPPFLAGS}"
   echo "CFLAGS=${CFLAGS}"
+  echo "CXXFLAGS=${CXXFLAGS}"
   echo "LDFLAGS=${LDFLAGS}"
   LogExecute ${CONFIGURE} \
     --host=${conf_host} \
@@ -842,8 +876,14 @@ ConfigureStep_Autotools() {
 
 
 ConfigureStep_CMake() {
-  MakeDir ${BUILD_DIR}
-  ChangeDir ${BUILD_DIR}
+  if [ "${VERBOSE:-}" = "1" ]; then
+    MAKE_TARGETS+=" VERBOSE=1"
+  fi
+
+  EXTRA_CMAKE_ARGS=${EXTRA_CMAKE_ARGS:-}
+  if [ "${NACL_GLIBC}" != "1" ]; then
+    EXTRA_CMAKE_ARGS+=" -DEXTRA_INCLUDE=${NACLPORTS_INCLUDE}/glibc-compat"
+  fi
 
   CC="${NACLCC}" CXX="${NACLCXX}" LogExecute cmake ..\
            -DCMAKE_TOOLCHAIN_FILE=${TOOLS_DIR}/XCompile-nacl.cmake \
@@ -858,13 +898,15 @@ ConfigureStep_CMake() {
 
 
 DefaultBuildStep() {
-  ChangeDir ${BUILD_DIR}
   # Build ${MAKE_TARGETS} or default target if it is not defined
   if [ -n "${MAKEFLAGS:-}" ]; then
     echo "MAKEFLAGS=${MAKEFLAGS}"
     export MAKEFLAGS
   fi
-  export PATH=${NACL_BIN_PATH}:${PATH};
+  if [ "${VERBOSE:-}" = "1" ]; then
+    MAKE_TARGETS+=" VERBOSE=1 V=1"
+  fi
+  export PATH=${NACL_BIN_PATH}:${PATH}
   LogExecute make -j${OS_JOBS} ${MAKE_TARGETS:-}
 }
 
@@ -874,51 +916,13 @@ DefaultTestStep() {
 }
 
 
-#
-# Build step for projects based on the NaCl SDK build
-# system (common.mk).
-#
-BuildStep_SDKBuildSystem() {
-  # We override $(OUTBASE) to force the build system to put
-  # all its artifacts in ${NACL_PACKAGES_REPOSITORY} rather
-  # than alongside the Makefile.
-  export OUTBASE=${NACL_PACKAGES_REPOSITORY}/${PACKAGE_DIR}
-  export CFLAGS=${NACLPORTS_CFLAGS}
-  export CXXFLAGS=${NACLPORTS_CXXFLAGS}
-  export LDFLAGS=${NACLPORTS_LDFLAGS}
-  export NACLPORTS_INCLUDE
-  export NACLPORTS_PREFIX
-  export NACL_PACKAGES_PUBLISH
-  export NACL_SRC
-
-  if [ "${NACL_ARCH}" = "pnacl" ]; then
-    MAKEFLAGS+=" TOOLCHAIN=pnacl"
-  elif [ "${NACL_GLIBC}" = "1" ]; then
-    MAKEFLAGS+=" TOOLCHAIN=glibc"
-    MAKEFLAGS+=" NACL_ARCH=${NACL_ARCH_ALT}"
-  else
-    MAKEFLAGS+=" TOOLCHAIN=newlib"
-    MAKEFLAGS+=" NACL_ARCH=${NACL_ARCH_ALT}"
-  fi
-  if [ "${NACL_DEBUG}" = "1" ]; then
-    MAKEFLAGS+=" CONFIG=Debug"
-  else
-    MAKEFLAGS+=" CONFIG=Release"
-  fi
-  MAKEFLAGS+=" V=1"
-  export MAKEFLAGS
-  ChangeDir ${START_DIR}
-  DefaultBuildStep
-}
-
-
 DefaultInstallStep() {
   # assumes pwd has makefile
   if [ -n "${MAKEFLAGS:-}" ]; then
     echo "MAKEFLAGS=${MAKEFLAGS}"
     export MAKEFLAGS
   fi
-  export PATH=${NACL_BIN_PATH}:${PATH};
+  export PATH=${NACL_BIN_PATH}:${PATH}
   LogExecute make ${INSTALL_TARGETS:-install}
 }
 
@@ -960,19 +964,40 @@ Validate() {
 
 
 #
-# Validate (using ncval) any executables specified in the $EXECUTABLES
-# variable.
+# PostBuildStep by default will validae (using ncval) any executables
+# specified in the $EXECUTABLES as well as create wrapper scripts
+# for running them in sel_ldr.
 #
-DefaultValidateStep() {
-  if [ "${NACL_ARCH}" = "pnacl" -o "${NACL_ARCH}" = "emscripten" ]; then
+DefaultPostBuildStep() {
+  if [ "${NACL_ARCH}" = "emscripten" ]; then
+    return;
+  fi
+
+  if [ -z "${EXECUTABLES:-}" ]; then
     return
   fi
 
-  if [ -n "${EXECUTABLES:-}" ]; then
-    for nexe in $EXECUTABLES ; do
-      Validate $nexe
+  if [ "${NACL_ARCH}" = "pnacl" ]; then
+    for pexe in ${EXECUTABLES} ; do
+      FinalizePexe ${pexe}
     done
+    for pexe in ${EXECUTABLES} ; do
+      TranslatePexe ${pexe}
+    done
+    return
   fi
+
+  for nexe in $EXECUTABLES ; do
+    Validate ${nexe}
+    # Create a script which will run the executable in sel_ldr.  The name
+    # of the script is the same as the name of the executable, either without
+    # any extension or with the .sh extension.
+    if [[ ${nexe} == *${NACL_EXEEXT} && ! -d ${nexe%%${NACL_EXEEXT}} ]]; then
+      WriteSelLdrScript ${nexe%%${NACL_EXEEXT}} $(basename ${nexe})
+    else
+      WriteSelLdrScript $nexe.sh $(basename ${nexe})
+    fi
+  done
 }
 
 
@@ -1059,8 +1084,9 @@ IRT=${NACL_IRT}
 HERE
   fi
   chmod 750 $1
-  echo "Wrote script pwd:$PWD $1"
+  echo "Wrote script $1 -> $2"
 }
+
 
 TranslateAndWriteSelLdrScript() {
   local PEXE=$1
@@ -1074,6 +1100,7 @@ TranslateAndWriteSelLdrScript() {
   TimeCommand ${TRANSLATOR} ${PEXE_FINAL} -arch ${ARCH} -o ${NEXE}
   WriteSelLdrScriptForPNaCl ${SCRIPT} ${NEXE} ${ARCH}
 }
+
 
 #
 # Write a wrapper script that will run a nexe under sel_ldr, for PNaCl
@@ -1114,19 +1141,11 @@ HERE
   echo "Wrote script $PWD/${script_name}"
 }
 
+
 FinalizePexe() {
   local pexe=$1
   Banner "Finalizing ${pexe}"
   TimeCommand ${PNACLFINALIZE} ${pexe}
-}
-
-
-FinalizePexes() {
-  if [ ${NACL_ARCH} = "pnacl" -a -n "${EXECUTABLES:-}" ]; then
-    for pexe in ${EXECUTABLES} ; do
-      FinalizePexe ${pexe}
-    done
-  fi
 }
 
 
@@ -1159,17 +1178,6 @@ TranslatePexe() {
 }
 
 
-DefaultTranslateStep() {
-  FinalizePexes
-
-  if [ ${NACL_ARCH} = "pnacl" -a -n "${EXECUTABLES:-}" ]; then
-    for pexe in ${EXECUTABLES} ; do
-      TranslatePexe ${pexe}
-    done
-  fi
-}
-
-
 DefaultPackageInstall() {
   RunPreInstallStep
   if IsGitRepo; then
@@ -1181,11 +1189,8 @@ DefaultPackageInstall() {
   RunPatchStep
   RunConfigureStep
   RunBuildStep
-  RunTranslateStep
-  RunValidateStep
-  if [ "${SKIP_SEL_LDR_TESTS}" != "1" ]; then
-    RunTestStep
-  fi
+  RunPostBuildStep
+  RunTestStep
   RunInstallStep
 }
 
@@ -1193,7 +1198,10 @@ DefaultPackageInstall() {
 NaclportsMain() {
   local COMMAND=PackageInstall
   if [[ $# -gt 0 ]]; then
-    COMMAND=$1
+    COMMAND=Run$1
+  fi
+  if [ -d "${BUILD_DIR}" ]; then
+    ChangeDir ${BUILD_DIR}
   fi
   ${COMMAND}
 }
@@ -1201,11 +1209,27 @@ NaclportsMain() {
 
 RunStep() {
   local STEP_FUNCTION=$1
-  if [ $# -gt 1 ]; then
-    local TITLE=$2
+  local DIR=''
+  shift
+  if [ $# -gt 0 ]; then
+    local TITLE=$1
+    shift
     Banner "${TITLE} ${PACKAGE_NAME}"
   fi
-  ${STEP_FUNCTION}
+  if [ $# -gt 0 ]; then
+    DIR=$1
+    shift
+  fi
+  if [ -n "${DIR}" ]; then
+    if [ ! -d ${DIR} ]; then
+      MakeDir ${DIR}
+    fi
+    ChangeDir ${DIR}
+  fi
+  ArchiveName
+  # Step functions are run in sub-shell so that they are independent
+  # from each other.
+  ( ${STEP_FUNCTION} )
 }
 
 
@@ -1217,8 +1241,7 @@ ExtractStep()    { DefaultExtractStep;    }
 PatchStep()      { DefaultPatchStep;      }
 ConfigureStep()  { DefaultConfigureStep;  }
 BuildStep()      { DefaultBuildStep;      }
-TranslateStep()  { DefaultTranslateStep;  }
-ValidateStep()   { DefaultValidateStep;   }
+PostBuildStep()  { DefaultPostBuildStep;  }
 TestStep()       { DefaultTestStep;       }
 InstallStep()    { DefaultInstallStep;    }
 PackageInstall() { DefaultPackageInstall; }
@@ -1228,12 +1251,18 @@ RunDownloadStep()   { RunStep DownloadStep; }
 RunGitCloneStep()   { RunStep GitCloneStep; }
 RunExtractStep()    { RunStep ExtractStep; }
 RunPatchStep()      { RunStep PatchStep; }
-RunConfigureStep()  { RunStep ConfigureStep "Configuring "; }
-RunBuildStep()      { RunStep BuildStep "Building "; }
-RunTranslateStep()  { RunStep TranslateStep "Translating "; }
-RunValidateStep()   { RunStep ValidateStep "Validating "; }
-RunTestStep()       { RunStep TestStep "Testing "; }
-RunInstallStep()    { RunStep InstallStep "Installing "; }
+RunConfigureStep()  {
+  RunStep ConfigureStep "Configuring" ${BUILD_DIR};
+}
+RunBuildStep()      { RunStep BuildStep "Building" ${BUILD_DIR}; }
+RunPostBuildStep()  { RunStep PostBuildStep "PostBuild" ${BUILD_DIR}; }
+RunTestStep()       {
+  if [ "${SKIP_SEL_LDR_TESTS}" = "1" ]; then
+    return;
+  fi
+  RunStep TestStep "Testing" ${BUILD_DIR}
+}
+RunInstallStep()    { RunStep InstallStep "Installing" ${BUILD_DIR}; }
 
 ######################################################################
 # Always run

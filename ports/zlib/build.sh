@@ -12,13 +12,11 @@ if [ "${NACL_GLIBC}" = "1" ]; then
 fi
 
 ConfigureStep() {
-  MakeDir ${BUILD_DIR}
-  ChangeDir ${BUILD_DIR}
   LogExecute rm -f libz.*
   PATH=${NACL_BIN_PATH}:${PATH} \
     CC=${NACLCC} \
     CHOST=${NACL_CROSS_PREFIX} \
-    CFLAGS="${NACLPORTS_CFLAGS}" \
+    CFLAGS="${NACLPORTS_CPPFLAGS} ${NACLPORTS_CFLAGS}" \
     LogExecute ./configure --prefix="${NACLPORTS_PREFIX}"
 }
 
@@ -74,9 +72,7 @@ TestStep() {
       example.x86-64.nexe ${example_script}
     RunExample
   else
-    WriteSelLdrScript minigzip minigzip.nexe
     RunMinigzip
-    WriteSelLdrScript example example.nexe
     RunExample
   fi
 }

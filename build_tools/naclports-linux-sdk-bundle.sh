@@ -5,11 +5,12 @@
 
 # This script builds the packages that will be bundled with the NaCl SDK.
 
+set -o errexit
+
 SCRIPT_DIR="$(cd $(dirname $0) && pwd)"
+source ${SCRIPT_DIR}/bot_common.sh
 
-source ${SCRIPT_DIR}/../bot_common.sh
-
-NACLPORTS_ROOT="$(cd ${SCRIPT_DIR}/../../.. && pwd)"
+NACLPORTS_ROOT="$(cd ${SCRIPT_DIR}/.. && pwd)"
 OUT_DIR=${NACLPORTS_ROOT}/out
 
 OUT_BUNDLE_DIR=${OUT_DIR}/sdk_bundle
@@ -26,6 +27,10 @@ fi
 # Don't build lua with readline support. We don't want to include
 # readline and ncurses in the SDK.
 export LUA_NO_READLINE=1
+# Also, disable automatic building of dependencies, otherwise readline
+# and any other unindented dependencies will get build along eith the
+# libraries we want.
+export NODEPS=1
 
 PACKAGES=$(make sdklibs_list)
 

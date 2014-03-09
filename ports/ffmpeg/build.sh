@@ -3,12 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+EXECUTABLES="ffmpeg ffmpeg_g ffprobe ffprobe_g"
+
 ConfigureStep() {
-  export PKG_CONFIG_PATH=${NACLPORTS_LIBDIR}/pkgconfig
-  export PKG_CONFIG_LIBDIR=${NACLPORTS_LIBDIR}
-  export PATH=${NACL_BIN_PATH}:${PATH};
-  MakeDir ${NACL_PACKAGES_REPOSITORY}/${PACKAGE_NAME}/${NACL_BUILD_SUBDIR}
-  ChangeDir ${NACL_PACKAGES_REPOSITORY}/${PACKAGE_NAME}/${NACL_BUILD_SUBDIR}
+  SetupCrossEnvironment
+
   local extra_args=""
   if [ "${NACL_ARCH}" = pnacl ]; then
     extra_args="--cc=pnacl-clang --arch=pnacl"
@@ -26,9 +25,8 @@ ConfigureStep() {
     extra_args+=" --extra-libs=-lglibc-compat"
   fi
 
-  ../configure \
+  LogExecute ../configure \
     --cross-prefix=${NACL_CROSS_PREFIX}- \
-    ${extra_args} \
     --target-os=linux \
     --enable-gpl \
     --enable-static \
@@ -50,5 +48,6 @@ ConfigureStep() {
     --disable-demuxer=rtsp \
     --disable-demuxer=image2 \
     --prefix=${NACLPORTS_PREFIX} \
-    --libdir=${NACLPORTS_LIBDIR}
+    --libdir=${NACLPORTS_LIBDIR} \
+    ${extra_args}
 }

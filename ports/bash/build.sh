@@ -4,33 +4,27 @@
 # found in the LICENSE file.
 
 
-export EXTRA_CONFIGURE_ARGS="--prefix= --exec-prefix="
-export EXTRA_CONFIGURE_ARGS="${EXTRA_CONFIGURE_ARGS} --with-curses"
-
+EXTRA_CONFIGURE_ARGS="--prefix= --exec-prefix= --with-curses"
+NACLPORTS_CPPFLAGS+=" -DHAVE_GETHOSTNAME -DNO_MAIN_ENV_ARG"
 export EXTRA_LIBS="${NACL_CLI_MAIN_LIB} -ltar \
 -lppapi_simple -lnacl_spawn -lnacl_io -lppapi -lppapi_cpp"
 CONFIG_SUB=support/config.sub
 
 PatchStep() {
   DefaultPatchStep
-  ChangeDir ${NACL_PACKAGES_REPOSITORY}/${PACKAGE_DIR}
+  ChangeDir ${SRC_DIR}
   cp ${START_DIR}/bash_pepper.c bash_pepper.c
-}
-
-ConfigureStep() {
-  export NACLPORTS_CFLAGS="${NACLPORTS_CFLAGS} -DHAVE_GETHOSTNAME -DNO_MAIN_ENV_ARG"
-  DefaultConfigureStep
 }
 
 InstallStep() {
   MakeDir ${PUBLISH_DIR}
   local ASSEMBLY_DIR="${PUBLISH_DIR}/bash"
 
-  export INSTALL_TARGETS="DESTDIR=${ASSEMBLY_DIR}/bashtar install"
+  INSTALL_TARGETS="DESTDIR=${ASSEMBLY_DIR}/bashtar install"
   DefaultInstallStep
 
   ChangeDir ${ASSEMBLY_DIR}/bashtar
-  cp bin/bash ../bash_${NACL_ARCH}${NACL_EXEEXT}
+  cp bin/bash${NACL_EXEEXT} ../bash_${NACL_ARCH}${NACL_EXEEXT}
   rm -rf bin
   rm -rf share/man
   tar cf ${ASSEMBLY_DIR}/bash.tar .

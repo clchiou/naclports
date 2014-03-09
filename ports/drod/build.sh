@@ -5,11 +5,12 @@
 
 PACKAGE_DIR=drod-213fa477000429fb9a5f4a77673394d47cadbfac
 EXECUTABLES=custom/bin/drod
-BUILD_DIR=${NACL_PACKAGES_REPOSITORY}/${PACKAGE_DIR}/Caravel/Master/Linux
+SRC_DIR=${NACL_PACKAGES_REPOSITORY}/${PACKAGE_DIR}
+BUILD_DIR=${SRC_DIR}/Caravel/Master/Linux
 MAKE_TARGETS="drod-custom"
-export DESTDIR=${PUBLISH_DIR}/.data
+OS_JOBS=1
 
-ConfigureStep() {
+BuildStep() {
   export CC=${NACLCC}
   export CXX=${NACLCXX}
   export AR="${NACLAR} cr"
@@ -19,9 +20,11 @@ ConfigureStep() {
   export LDFLAGS_common=${NACLPORTS_LDFLAGS}
   export EXTRA_LIBS="-lSDL_mixer -lSDL -lmikmod -lvorbisfile -lvorbisenc \
                      -lvorbis -logg -lfreetype -lSDLmain -ltar -lnacl_io"
+  DefaultBuildStep
 }
 
 InstallStep() {
+  export DESTDIR=${PUBLISH_DIR}/.data
   DefaultInstallStep
 
   ChangeDir ${DESTDIR}

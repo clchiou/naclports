@@ -6,12 +6,12 @@
 
 # readline has config.sub in a 'support' subfolder
 CONFIG_SUB=support/config.sub
-MAKEFLAGS+=" EXEEXT=.nexe"
+MAKEFLAGS+=" EXEEXT=.${NACL_EXEEXT}"
 
 if [ "${NACL_GLIBC}" != "1" ]; then
-   NACLPORTS_CFLAGS+=" -I${NACLPORTS_INCLUDE}/glibc-compat"
+   NACLPORTS_CPPFLAGS+=" -I${NACLPORTS_INCLUDE}/glibc-compat"
    EXTRA_CONFIGURE_ARGS="--disable-shared"
-   export LIBS=-lglibc-compat
+   export LIBS="-lglibc-compat"
 fi
 
 

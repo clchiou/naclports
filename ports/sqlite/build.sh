@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 MAKE_TARGETS="CCLD=\$(CXX) all"
-NACLPORTS_CFLAGS+=" -DNACL_SDK_VERSION=$NACL_SDK_VERSION"
+NACLPORTS_CPPFLAGS+=" -DNACL_SDK_VERSION=$NACL_SDK_VERSION"
 export LIBS="-lnacl_io -pthread"
 if [ ${NACL_GLIBC} != "1" ]; then
   EXTRA_CONFIGURE_ARGS=--disable-dynamic-extensions
@@ -13,14 +13,14 @@ else
   EXECUTABLE_DIR=.libs
 fi
 
+EXECUTABLES="${EXECUTABLE_DIR}/sqlite3${NACL_EXEEXT}"
+
 BuildStep() {
-  if [ -f ${SRC_DIR}/shell.c ]; then
+  if [ -f "${SRC_DIR}/shell.c" ]; then
     touch ${SRC_DIR}/shell.c
   fi
   DefaultBuildStep
-  if [ ${NACL_ARCH} != "pnacl" ]; then
-    WriteSelLdrScript sqlite3 ${EXECUTABLE_DIR}/sqlite3${NACL_EXEEXT}
-  else
+  if [ "${NACL_ARCH}" = "pnacl" ]; then
     local pexe=${EXECUTABLE_DIR}/sqlite3${NACL_EXEEXT}
     TranslateAndWriteSelLdrScript ${pexe} x86-64 sqlite3.x86-64.nexe sqlite3
   fi
