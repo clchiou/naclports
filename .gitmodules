@@ -10,3 +10,6 @@
 [submodule "ports/tesseract-ocr"]
 	path = ports/tesseract-ocr
 	url = https://github.com/clchiou/tesseract-ocr.git
+[submodule "ports/dosbox-svn"]
+	path = ports/dosbox-svn
+	url = https://github.com/clchiou/dosbox.git
