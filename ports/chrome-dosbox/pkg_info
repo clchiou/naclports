@@ -1,0 +1,2 @@
+PACKAGE_NAME=chrome-dosbox
+DEPENDS=(boost)
