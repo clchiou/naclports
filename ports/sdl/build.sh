@@ -19,6 +19,9 @@ AutogenStep() {
 
 
 ConfigureTests() {
+  # XXX: Don't build tests since we roll our own pp::Module.
+  return
+
   Banner "Configuring tests for ${PACKAGE_NAME}"
 
   SetupCrossEnvironment
@@ -47,6 +50,9 @@ ConfigureTests() {
 
 
 ConfigureStep() {
+  # XXX: Empty this file since we roll our own pp::Module.
+  echo > ${SRC_DIR}/src/main/nacl/pepper_instance.c
+
   AutogenStep
 
   SetupCrossEnvironment
@@ -72,6 +78,9 @@ ConfigureStep() {
 
 
 InstallTests() {
+  # XXX: Don't build tests since we roll our own pp::Module.
+  return
+
   local PUBLISH_DIR=${NACL_PACKAGES_PUBLISH}/sdl-tests/${NACL_ARCH}-${NACL_LIBC}
   Remove ${PUBLISH_DIR}
   MakeDir ${PUBLISH_DIR}
