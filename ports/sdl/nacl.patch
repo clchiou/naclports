@@ -433,9 +433,9 @@ index 0000000..908a498
 +  _this->hidden->opened = false;
 +
 +  // TODO: Move audio device creation to NACLAUD_OpenAudio.
-+  const PPB_Audio_1_1* g_nacl_audio_interface =
++  g_nacl_audio_interface =
 +      (const PPB_Audio_1_1*)g_nacl_get_interface(PPB_AUDIO_INTERFACE_1_1);
-+  const PPB_AudioConfig_1_1* g_nacl_audio_config_interface =
++  g_nacl_audio_config_interface =
 +      (const PPB_AudioConfig_1_1*)g_nacl_get_interface(
 +          PPB_AUDIO_CONFIG_INTERFACE_1_1);
 +
